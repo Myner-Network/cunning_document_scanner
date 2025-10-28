@@ -23,6 +23,13 @@ public class SwiftCunningDocumentScannerPlugin: NSObject, FlutterPlugin, VNDocum
             if VNDocumentCameraViewController.isSupported {
                 self.presentingController = VNDocumentCameraViewController()
                 self.presentingController!.delegate = self
+                
+                // Note: VNDocumentCameraViewController does not expose flash control.
+                // The flash is automatically managed by iOS based on lighting conditions.
+                // The flashMode setting is stored in scannerOptions for potential future
+                // use with a custom camera implementation.
+                // Flash mode requested: \(scannerOptions.flashMode.rawValue)
+                
                 presentedVC?.present(self.presentingController!, animated: true)
             } else {
                 result(FlutterError(code: "UNAVAILABLE", message: "Document camera is not available on this device", details: nil))

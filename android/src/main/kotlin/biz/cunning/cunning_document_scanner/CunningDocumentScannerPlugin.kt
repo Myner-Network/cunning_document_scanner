@@ -48,8 +48,9 @@ class CunningDocumentScannerPlugin : FlutterPlugin, MethodCallHandler, ActivityA
         if (call.method == "getPictures") {
             val noOfPages = call.argument<Int>("noOfPages") ?: 50;
             val isGalleryImportAllowed = call.argument<Boolean>("isGalleryImportAllowed") ?: false;
+            val flashMode = call.argument<String>("flashMode") ?: "auto";
             this.pendingResult = result
-            startScan(noOfPages, isGalleryImportAllowed)
+            startScan(noOfPages, isGalleryImportAllowed, flashMode)
         } else {
             result.notImplemented()
         }
@@ -154,13 +155,16 @@ class CunningDocumentScannerPlugin : FlutterPlugin, MethodCallHandler, ActivityA
     /**
      * create intent to launch document scanner and set custom options
      */
-    private fun createDocumentScanIntent(noOfPages: Int): Intent {
+    private fun createDocumentScanIntent(noOfPages: Int, flashMode: String): Intent {
         val documentScanIntent = Intent(activity, DocumentScannerActivity::class.java)
 
         documentScanIntent.putExtra(
             DocumentScannerExtra.EXTRA_MAX_NUM_DOCUMENTS,
             noOfPages
         )
+        
+        // Pass flash mode to fallback scanner for future implementation
+        documentScanIntent.putExtra("flashMode", flashMode)
 
         return documentScanIntent
     }
@@ -168,8 +172,12 @@ class CunningDocumentScannerPlugin : FlutterPlugin, MethodCallHandler, ActivityA
 
     /**
      * add document scanner result handler and launch the document scanner
+     * 
+     * Note: Google's ML Kit Document Scanner does not expose flash control.
+     * The flash is automatically managed by the system based on lighting conditions.
+     * The flashMode parameter is passed to the fallback scanner for potential future use.
      */
-    private fun startScan(noOfPages: Int, isGalleryImportAllowed: Boolean) {
+    private fun startScan(noOfPages: Int, isGalleryImportAllowed: Boolean, flashMode: String) {
         val options = GmsDocumentScannerOptions.Builder()
             .setGalleryImportAllowed(isGalleryImportAllowed)
             .setPageLimit(noOfPages)
@@ -180,6 +188,7 @@ class CunningDocumentScannerPlugin : FlutterPlugin, MethodCallHandler, ActivityA
         scanner.getStartScanIntent(activity).addOnSuccessListener {
             try {
                 // Use a custom request code for onActivityResult identification
+                // Note: ML Kit scanner does not support flash mode configuration
                 activity.startIntentSenderForResult(it, START_DOCUMENT_ACTIVITY, null, 0, 0, 0)
 
             } catch (e: IntentSender.SendIntentException) {
@@ -187,7 +196,8 @@ class CunningDocumentScannerPlugin : FlutterPlugin, MethodCallHandler, ActivityA
             }
         }.addOnFailureListener {
             if (it is MlKitException) {
-                val intent = createDocumentScanIntent(noOfPages)
+                // Fall back to custom scanner which can potentially support flash control
+                val intent = createDocumentScanIntent(noOfPages, flashMode)
                 try {
                     ActivityCompat.startActivityForResult(
                         this.activity,
